@@ -1,153 +1,145 @@
 import telebot
 import requests
-import re
-import os
-import json
-import base64
 import time
+import json
+import os
+import re
+import base64
 
-# --- ENV theke nibe, hardcode na ---
-BOT_TOKEN = os.environ.get("8772570139:AAEEgKyLBa0NWP2jdNhXD-jc3EkmJqOp9tc")
-API_KEY = os.environ.get("MKR8MCYN7MZ")
-GROUP_CHAT_ID = int(os.environ.get("GROUP_CHAT_ID", "-1004378025853"))
+BOT_TOKEN = os.environ.get("BOT_TOKEN", "8772570139:AAEEgKyLBa0NWP2jdNhXD-jc3EkmJqOp9tc")
+GROUP_CHAT_ID = int(os.environ.get("GROUP_CHAT_ID", "-1004429028470"))
+API_KEY = os.environ.get("API_KEY", "MKR8MCYN7MZ")
 BASE_URL = os.environ.get("BASE_URL", "https://api.2oo9.cloud/MXS47FLFX0U/tness/@public/api")
+SUPPORT_LINK = "https://t.me/flpsupport_bot"
 
 bot = telebot.TeleBot(BOT_TOKEN, threaded=False) if BOT_TOKEN else None
 headers = {"mauthapi": API_KEY, "Content-Type": "application/json"}
-
 USER_LAST_PURCHASE = {}
-NUMBER_TO_USER = {}
+
+def mask_phone_number(phone):
+    if not phone: return "Unknown"
+    s = str(phone)
+    return f"{s[:5]}★★★★★{s[-3:]}" if len(s) > 6 else s
 
 def get_main_menu_keyboard():
     markup = telebot.types.ReplyKeyboardMarkup(resize_keyboard=True)
-    markup.add(telebot.types.KeyboardButton("📱 Get Number"))
+    btn_get_num = telebot.types.KeyboardButton("📱 Get Number")
+    btn_support = telebot.types.KeyboardButton("👨‍💻 Customer Support")
+    markup.add(btn_get_num, btn_support)
     return markup
 
 if bot:
-
     @bot.message_handler(commands=['start', 'menu'])
     def send_welcome(message):
-        bot.send_message(message.chat.id, "👋 হ্যালো! Number নিতে 📱 Get Number চাপুন।", reply_markup=get_main_menu_keyboard())
-
-    # --- 1. Get Number -> Live Range ana ---
-    @bot.message_handler(func=lambda m: m.text == "📱 Get Number")
-    def handle_get_number(message):
         chat_id = message.chat.id
-        bot.send_message(chat_id, "🔍 সক্রিয় Range খোঁজা হচ্ছে...")
-        try:
-            res = requests.get(f"{BASE_URL}/console", headers=headers, timeout=20).json()
-            if res.get("meta", {}).get("status") == "ok":
-                hits = res.get("data", {}).get("hits", [])
-                unique_ranges = sorted(set(h.get("range") for h in hits if h.get("range")))
-                if not unique_ranges:
-                    bot.send_message(chat_id, "ℹ️ কোনো live range নেই।")
-                    return
-                markup = telebot.types.InlineKeyboardMarkup(row_width=2)
-                for r_code in unique_ranges:
-                    # FIX: : use korlam, _ na
-                    markup.add(telebot.types.InlineKeyboardButton(f"📱 Range: {r_code}", callback_data=f"buy:{r_code}"))
-                bot.send_message(chat_id, "🔥 **Live Range:**", reply_markup=markup, parse_mode="Markdown")
-            else:
-                bot.send_message(chat_id, f"❌ API Error: {res}")
-        except Exception as e:
-            bot.send_message(chat_id, f"⚠️ Error: {e}")
+        bot.send_message(chat_id, "👋 হ্যালো! নাম্বার বোটে আপনাকে স্বাগতম।\n\nনাম্বার নিতে নিচের **📱 Get Number** বাটনে চাপুন।", reply_markup=get_main_menu_keyboard())
 
-    # --- 2. Range theke Number neya ---
-    @bot.callback_query_handler(func=lambda c: c.data.startswith("buy:"))
+    @bot.message_handler(func=lambda message: message.text in ["📱 Get Number", "👨‍💻 Customer Support"])
+    def handle_text_buttons(message):
+        chat_id = message.chat.id
+        if message.text == "👨‍💻 Customer Support":
+            markup = telebot.types.InlineKeyboardMarkup()
+            markup.add(telebot.types.InlineKeyboardButton("💬 Contact Admin", url=SUPPORT_LINK))
+            bot.send_message(chat_id, "🤝 সাহায্যের জন্য Admin এর সাথে যোগাযোগ করুন:", reply_markup=markup)
+        elif message.text == "📱 Get Number":
+            bot.send_message(chat_id, "🔍 সক্রিয় নাম্বার রেঞ্জ খোঁজা হচ্ছে...")
+            try:
+                response = requests.get(f"{BASE_URL}/console", headers=headers, timeout=20).json()
+                if response.get("meta", {}).get("status") == "ok":
+                    hits = response.get("data", {}).get("hits", [])
+                    unique_ranges = sorted(set(h.get("range") for h in hits if h.get("range")))
+                    markup = telebot.types.InlineKeyboardMarkup(row_width=2)
+                    if unique_ranges:
+                        for r_code in unique_ranges:
+                            markup.add(telebot.types.InlineKeyboardButton(f"📱 Range: {r_code}", callback_data=f"buy:{r_code}"))
+                        bot.send_message(chat_id, "🔥 **বর্তমানে লাইভ থাকা রেঞ্জসমূহ:**\nনিচের যেকোনো একটি রেঞ্জের ওপর ক্লিক করে নাম্বার নিন:", reply_markup=markup, parse_mode="Markdown")
+                    else:
+                        bot.send_message(chat_id, "ℹ️ এই মুহূর্তে কোনো সক্রিয় রেঞ্জ পাওয়া যায়নি।")
+                else:
+                    bot.send_message(chat_id, "❌ সার্ভার কনসোল থেকে ডেটা পাওয়া যায়নি।")
+            except Exception as e:
+                bot.send_message(chat_id, f"⚠️ ত্রুটি ঘটেছে: {str(e)}")
+
+    @bot.callback_query_handler(func=lambda call: call.data.startswith("buy:"))
     def process_number_purchase(call):
         bot.answer_callback_query(call.id)
         chat_id = call.message.chat.id
         selected_range = call.data.split(":",1)[1]
-        bot.send_message(chat_id, f"⏳ `{selected_range}` থেকে number নেওয়া হচ্ছে...", parse_mode="Markdown")
+        bot.send_message(chat_id, f"⏳ `{selected_range}` রেঞ্জ থেকে নাম্বার বরাদ্দ করা হচ্ছে...", parse_mode="Markdown")
         try:
-            res = requests.post(f"{BASE_URL}/getnum", json={"rid": selected_range}, headers=headers, timeout=20).json()
-            if res.get("meta", {}).get("status") == "ok":
-                data = res.get("data", {})
-                full_number = str(data.get("full_number"))
-                order_rid = res.get("rid") or data.get("rid")
-
+            response = requests.post(f"{BASE_URL}/getnum", json={"rid": selected_range}, headers=headers, timeout=20).json()
+            if response.get("meta", {}).get("status") == "ok":
+                data = response.get("data", {})
+                full_number = data.get("full_number")
+                country = data.get("country")
+                order_rid = response.get("rid")
                 USER_LAST_PURCHASE[chat_id] = time.time()
-                NUMBER_TO_USER[full_number[-8:]] = chat_id # auto OTP er jonno
-
+                masked = mask_phone_number(full_number)
+                try:
+                    bot.send_message(GROUP_CHAT_ID, f"📱 **নতুন নাম্বার!**\nRID: `{order_rid}`\nNum: `{masked}`\n🌍 {country}", parse_mode="Markdown")
+                except: pass
                 markup = telebot.types.InlineKeyboardMarkup()
-                # FIX: : diye 4 ta part, jate full_number na vange
-                markup.add(telebot.types.InlineKeyboardButton("🔄 OTP চেক", callback_data=f"check:{order_rid}:{selected_range}:{full_number}"))
-                markup.add(telebot.types.InlineKeyboardButton("❌ বাতিল", callback_data=f"cancel:{order_rid}"))
-                bot.send_message(chat_id, f"✅ **Number Ready!**\n📱 `{full_number}`\n🔢 Range: `{selected_range}`\n\nOTP আসলে auto bot e আসবে।", reply_markup=markup, parse_mode="Markdown")
+                markup.add(telebot.types.InlineKeyboardButton("🔄 ওটিপি চেক করুন", callback_data=f"check:{order_rid}:{selected_range}:{full_number}"),
+                           telebot.types.InlineKeyboardButton("❌ বাতিল করুন", callback_data=f"cancel:{order_rid}"))
+                bot.send_message(chat_id, f"✅ **নাম্বার রেডি!**\n\n📱 `{full_number}`\n🌍 {country}\n🔢 `{selected_range}`\n\nনাম্বারটি বসিয়ে কোড পাঠান, তারপর OTP চেক করুন।", reply_markup=markup, parse_mode="Markdown")
             else:
-                bot.send_message(chat_id, f"❌ {res.get('message','Range খালি')}")
+                bot.send_message(chat_id, f"❌ {response.get('message','এই রেঞ্জে কোনো নাম্বার খালি নেই।')}")
         except Exception as e:
-            bot.send_message(chat_id, f"⚠️ {e}")
+            bot.send_message(chat_id, f"⚠️ সমস্যা: {str(e)}")
 
-    # --- 3. Group theke auto OTP bot e ana ---
-    @bot.message_handler(func=lambda m: m.chat.id == GROUP_CHAT_ID)
-    def group_otp_listener(message):
-        text = message.text or message.caption or ""
-        nums = re.findall(r'\d{8,15}', text)
-        otp_match = re.search(r'\b\d{4,8}\b', text)
-        if nums and otp_match:
-            for n in nums:
-                key = n[-8:]
-                if key in NUMBER_TO_USER:
-                    try:
-                        bot.send_message(NUMBER_TO_USER[key], f"🎉 **AUTO OTP!**\n📱 `{n}`\n🔑 `{otp_match.group(0)}`\n\n`{text}`", parse_mode="Markdown")
-                    except: pass
-
-    # --- 4. OTP Khoja (Manual Check) ---
-    @bot.callback_query_handler(func=lambda c: c.data.startswith("check:"))
+    @bot.callback_query_handler(func=lambda call: call.data.startswith("check:"))
     def check_otp_callback(call):
         chat_id = call.message.chat.id
         try:
-            # FIX: : diye split, phone number vange na
-            _, order_rid, selected_range, full_number = call.data.split(":", 3)
-        except:
-            bot.answer_callback_query(call.id, "Data error"); return
-
-        bot.answer_callback_query(call.id, text="OTP খোঁজা হচ্ছে...")
+            _, order_rid, selected_range, full_number = call.data.split(":",3)
+        except: return
+        bot.answer_callback_query(call.id, text="ওটিপি খোঁজা হচ্ছে...")
         try:
-            res = requests.get(f"{BASE_URL}/success-otp?rid={order_rid}", headers=headers, timeout=20).json()
-            if res.get("meta", {}).get("status") == "ok":
-                otps = res.get("data", {}).get("otps", [])
-                if otps:
-                    otp_message = otps[0].get("message")
+            response = requests.get(f"{BASE_URL}/success-otp?rid={order_rid}", headers=headers, timeout=20).json()
+            if response.get("meta", {}).get("status") == "ok":
+                otps_list = response.get("data", {}).get("otps", [])
+                if otps_list:
+                    otp_message = otps_list[0].get("message", "No content")
+                    data_phone = str(otps_list[0].get("number",""))
+                    masked = mask_phone_number(data_phone)
+                    try:
+                        bot.send_message(GROUP_CHAT_ID, f"🎉 **NEW OTP!**\n📱 `{masked}`\n💬 `{otp_message}`", parse_mode="Markdown")
+                    except: pass
                     next_markup = telebot.types.InlineKeyboardMarkup()
-                    next_markup.add(telebot.types.InlineKeyboardButton("🔄 Same Range Buy", callback_data=f"buy:{selected_range}"))
-                    next_markup.add(telebot.types.InlineKeyboardButton("📱 Change Range", callback_data="change_range"))
-                    bot.send_message(chat_id, f"🎉 **OTP:**\n`{otp_message}`\n✅ Received!", reply_markup=next_markup, parse_mode="Markdown")
+                    next_markup.add(telebot.types.InlineKeyboardButton("🔄 Same Range Auto Buy", callback_data=f"buy:{selected_range}"))
+                    next_markup.add(telebot.types.InlineKeyboardButton("📱 Change Range", callback_data="change_range_action"))
+                    bot.send_message(chat_id, f"🎉 **OTP Message:**\n`{otp_message}`\n\n✅ OTP Received!", reply_markup=next_markup, parse_mode="Markdown")
                 else:
                     markup = telebot.types.InlineKeyboardMarkup()
-                    markup.add(telebot.types.InlineKeyboardButton("🔄 Try Again", callback_data=f"check:{order_rid}:{selected_range}:{full_number}"))
-                    bot.send_message(chat_id, "⏳ এখনো OTP আসেনি, group থেকে auto আসবে।", reply_markup=markup)
-            else:
-                bot.send_message(chat_id, "⏳ Log e data নেই।")
+                    markup.add(telebot.types.InlineKeyboardButton("🔄 Try Again", callback_data=f"check:{order_rid}:{selected_range}:{full_number}"),
+                               telebot.types.InlineKeyboardButton("❌ বাতিল", callback_data=f"cancel:{order_rid}"))
+                    bot.send_message(chat_id, "⏳ OTP এখনো আসেনি। আবার চেষ্টা করুন।", reply_markup=markup)
         except Exception as e:
             bot.send_message(chat_id, f"⚠️ {e}")
 
-    # --- 5. Number Change (Range Change) ---
-    @bot.callback_query_handler(func=lambda c: c.data == "change_range")
+    @bot.callback_query_handler(func=lambda call: call.data == "change_range_action")
     def change_range_callback(call):
         chat_id = call.message.chat.id
-        last = USER_LAST_PURCHASE.get(chat_id, 0)
-        if time.time() - last < 30:
-            bot.answer_callback_query(call.id, f"⚠️ 30 sec por change korte parben, {int(30-(time.time()-last))}s baki", show_alert=True)
+        if time.time() - USER_LAST_PURCHASE.get(chat_id,0) < 30:
+            bot.answer_callback_query(call.id, f"⚠️ 30s পর Change করতে পারবেন", show_alert=True)
             return
         bot.answer_callback_query(call.id)
-        # abar range list dekhao
         call.message.text = "📱 Get Number"
-        handle_get_number(call.message)
+        handle_text_buttons(call.message)
 
-    @bot.callback_query_handler(func=lambda c: c.data.startswith("cancel:"))
+    @bot.callback_query_handler(func=lambda call: call.data.startswith("cancel:"))
     def cancel_order_callback(call):
-        rid = call.data.split(":",1)[1]
+        order_rid = call.data.split(":",1)[1]
         try:
-            requests.post(f"{BASE_URL}/cancel", json={"rid": rid}, headers=headers, timeout=10)
-            bot.answer_callback_query(call.id, "Cancel Done")
-            bot.send_message(call.message.chat.id, "❌ Cancel করা হয়েছে।")
-        except: pass
+            requests.post(f"{BASE_URL}/cancel", json={"rid": order_rid}, headers=headers, timeout=10)
+            bot.answer_callback_query(call.id, text="বাতিল করা হয়েছে।")
+            bot.send_message(call.message.chat.id, "❌ অর্ডার বাতিল করা হয়েছে।")
+        except:
+            bot.send_message(call.message.chat.id, "⚠️ বাতিল করা যায়নি।")
 
 def handler(event, context):
     if event.get('httpMethod') == 'GET':
-        return {"statusCode": 200, "body": f"Bot running - Token:{bool(BOT_TOKEN)}"}
+        return {"statusCode": 200, "body": "Bot running"}
     try:
         if not bot: return {"statusCode": 200, "body": "BOT_TOKEN missing"}
         body = event.get('body','')
