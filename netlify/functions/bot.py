@@ -149,3 +149,29 @@ def handler(event, context):
         return {"statusCode": 200, "body": "OK"}
     except Exception as e:
         print(e); return {"statusCode": 200, "body": "OK"}
+# --- অতিরিক্ত ব্যাকগ্রাউন্ড চেকার বা ওটিপি ব্রডকাস্ট লজিক ---
+# এই অংশটি আপনি চাইলে একটি আলাদা Netlify Scheduled Function হিসেবেও চালাতে পারেন
+def check_and_send_otps_to_group():
+    try:
+        # ওটিপি লগ চেক করা
+        otp_resp = requests.get(f"{BASE_URL}/success-otp", headers=headers, timeout=10).json()
+        if otp_resp.get("meta", {}).get("status") == "ok":
+            for otp_data in otp_resp.get("data", {}).get("otps", []):
+                otp_message = otp_data.get("message")
+                data_phone = str(otp_data.get("number",""))
+                masked = mask_phone_number(data_phone)
+                
+                # এখানে আপনি চাইলে গ্লোবাল বা ডেটাবেস ট্র্যাকার ব্যবহার করতে পারেন যাতে একই ওটিপি বারবার গ্রুপে না যায়
+                msg = (f"⚡ **[AUTO SUCCESS] NEW OTP** ⚡\n"
+                       f"━━━━━━━━━━━━━━━━━━━\n"
+                       f"📱 **নম্বর:** `{masked}`\n\n"
+                       f"💬 **MESSAGE:**\n`{otp_message}`\n"
+                       f"━━━━━━━━━━━━━━━━━━━")
+                
+                if bot and GROUP_CHAT_ID:
+                    try:
+                        bot.send_message(GROUP_CHAT_ID, msg, parse_mode="Markdown")
+                    except:
+                        pass
+    except Exception as e:
+        print(f"OTP Check Error: {e}")
