@@ -1,4 +1,4 @@
-const BOT_TOKEN = process.env.BOT_TOKEN || "8772570139:AAEEgKyLBa0NWP2jdNhXD-jc3EkmJqOp9tc";
+const BOT_TOKEN = process.env.BOT_TOKEN || "8701736168:AAHhfQUelJm-Fl3BCGQmQ55biNdzYP6_EXw";
 const API_KEY = process.env.API_KEY || "MKR8MCYN7MZ";
 const GROUP_CHAT_ID = -1004429028470;
 const BASE_URL = "https://api.2oo9.cloud/MXS47FLFX0U/tness/@public/api";
@@ -10,7 +10,6 @@ exports.handler = async (event) => {
   try {
     const update = JSON.parse(event.body);
 
-    // /start
     if (update.message && update.message.text === "/start") {
       await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -18,7 +17,6 @@ exports.handler = async (event) => {
       });
     }
 
-    // Get Number -> Range
     if (update.message && update.message.text === "📱 Get Number") {
       await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chat_id: update.message.chat.id, text: "🔍 সক্রিয় নাম্বার রেঞ্জ খোঁজা হচ্ছে..." }) });
       let res = await fetch(`${BASE_URL}/console`, { headers: { "mauthapi": API_KEY } }).then(r=>r.json());
@@ -33,12 +31,10 @@ exports.handler = async (event) => {
       }
     }
 
-    // Support
     if (update.message && update.message.text === "👨‍💻 Customer Support") {
       await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chat_id: update.message.chat.id, text: "🤝 Support:", reply_markup: { inline_keyboard: [[{ text: "💬 Contact Admin", url: SUPPORT_LINK }]] } }) });
     }
 
-    // Buy range -> Number
     if (update.callback_query && update.callback_query.data.startsWith("buy:")) {
       let range = update.callback_query.data.split(":")[1];
       let chatId = update.callback_query.message.chat.id;
@@ -51,7 +47,6 @@ exports.handler = async (event) => {
       }
     }
 
-    // Check OTP
     if (update.callback_query && update.callback_query.data.startsWith("check:")) {
       let [, rid, range, full] = update.callback_query.data.split(":");
       let chatId = update.callback_query.message.chat.id;
@@ -64,20 +59,19 @@ exports.handler = async (event) => {
       }
     }
 
-    // Change Range + Cancel
     if (update.callback_query && update.callback_query.data === "change_range_action") {
       let chatId = update.callback_query.message.chat.id;
       let last = lastPurchase.get(chatId) || 0;
       if (Date.now() - last < 30000) {
         await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/answerCallbackQuery`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ callback_query_id: update.callback_query.id, text: "⚠️ 30s পর Change করুন", show_alert: true }) });
       } else {
-        // trigger get number again
         let res = await fetch(`${BASE_URL}/console`, { headers: { "mauthapi": API_KEY } }).then(r=>r.json());
         let ranges = [...new Set((res.data?.hits || []).map(h=>h.range).filter(Boolean))].sort();
         let kb = ranges.map(r=>[{ text: `📱 Range: ${r}`, callback_data: `buy:${r}` }]);
         await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chat_id: chatId, text: "🔥 **Live Range:**", reply_markup: { inline_keyboard: kb }, parse_mode: "Markdown" }) });
       }
     }
+
     if (update.callback_query && update.callback_query.data.startsWith("cancel:")) {
       let rid = update.callback_query.data.split(":")[1];
       await fetch(`${BASE_URL}/cancel`, { method: "POST", headers: { "mauthapi": API_KEY, "Content-Type": "application/json" }, body: JSON.stringify({ rid }) });
