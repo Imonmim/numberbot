@@ -1,12 +1,11 @@
-import telebot
-import requests
-import time
-import json
 import os
-import re
+import json
 import base64
+import time
+import requests
+import telebot
 
-BOT_TOKEN = os.environ.get("BOT_TOKEN", "8772570139:AAEEgKyLBa0NWP2jdNhXD-jc3EkmJqOp9tc")
+BOT_TOKEN = os.environ.get("BOT_TOKEN", "8701736168:AAHhfQUelJm-Fl3BCGQmQ55biNdzYP6_EXw")
 GROUP_CHAT_ID = int(os.environ.get("GROUP_CHAT_ID", "-1004429028470"))
 API_KEY = os.environ.get("API_KEY", "MKR8MCYN7MZ")
 BASE_URL = os.environ.get("BASE_URL", "https://api.2oo9.cloud/MXS47FLFX0U/tness/@public/api")
